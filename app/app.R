@@ -13,15 +13,15 @@ library(shiny)
 library(bslib)
 library(ggplot2)
 library(maps)
-library(mapdata)
+# library(mapdata)
 library(mapproj)
 library(AmesHousing)
 
 source("helpers.R")
 
-iowa <- map("state", "iowa")
+# iowa <- map("state", "iowa")
 counties <- readRDS("data/counties.rds")
-ames <- make_ames()
+# ames <- make_ames()
 
 # Define UI for application
 ui <- page_sidebar(
