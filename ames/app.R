@@ -36,7 +36,7 @@ ui <- page_sidebar(
   card(
     card_header("Variable Selection"),
     textOutput("selected_var"),
-    style = "height: 50px;"
+    style = "height: 100px;"
     )
   ,
   card(
