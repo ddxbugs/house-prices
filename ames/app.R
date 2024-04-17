@@ -11,7 +11,7 @@ library(shiny)
 library(bslib)
 library(ggplot2)
 
-ames <- read.csv("../data/train.csv")
+ames <- read.csv("data/train.csv")
 
 # Define UI for application 
 ui <- page_sidebar(
@@ -40,7 +40,9 @@ server <- function(input, output) {
     ames_subset <- subset(ames, Neighborhood==input$neighborhood)
     ggplot(data=ames_subset, aes(x=GrLivArea, y=SalePrice)) +
       geom_point() +
-      geom_smooth(method="lm")
+      geom_smooth(method="lm") +
+      ggtitle("Scatter plot: Sale Price (USD) vs. Living Area (sqft)", 
+              paste(ames_subset$Neighborhood, ", n=", nrow(ames_subset)))
   })
 }
 
