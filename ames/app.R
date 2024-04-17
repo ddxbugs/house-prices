@@ -10,35 +10,37 @@
 library(shiny)
 library(bslib)
 library(ggplot2)
-library(AmesHousing)
 
-ames <- make_ames()
+ames <- read.csv("../data/train.csv")
 
 # Define UI for application 
 ui <- page_sidebar(
+  title="Century 21 Ames Housing Market Analysis",
   sidebar=sidebar(
-    
     selectInput(
     inputId="neighborhood",
     label="Neighborhood",
     choices=c(
       "North Ames"="NAmes",
-      "Edwards"="edwards",
-      "Brookside"="Brkside"
+      "Edwards"="Edwards",
+      "Brookside"="BrkSide"
       ),
     selected="Names"
     ),
   ),
   card(
-    plotOutput(outputId = "scatterplot")
+    card_header("Plot Visualization"),
+    plotOutput(outputId = "scatterplot"),
   )
 )
 
 # Define server logic required to render output
 server <- function(input, output) {
   output$scatterplot <- renderPlot({
-    ggplot(data=ames, aes_string(x=input$x, y=input$y)) +
-      geom_point(method="lm")
+    ames_subset <- subset(ames, Neighborhood==input$neighborhood)
+    ggplot(data=ames_subset, aes(x=GrLivArea, y=SalePrice)) +
+      geom_point() +
+      geom_smooth(method="lm")
   })
 }
 
