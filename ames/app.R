@@ -27,7 +27,16 @@ ui <- page_sidebar(
       ),
     selected="Names"
     ),
+    checkboxGroupInput(
+      inputId="checkGroup",
+      "Log Transformation",
+      choices=list("X-axis"="X", "Y-axis"="Y"),
+    )
   ),
+  card(
+    card_header("Variable Selection"),
+    textOutput("selected_var"))
+  ,
   card(
     card_header("Plot Visualization"),
     plotOutput(outputId = "scatterplot"),
@@ -36,13 +45,20 @@ ui <- page_sidebar(
 
 # Define server logic required to render output
 server <- function(input, output) {
+  output$selected_var <- renderText({
+    paste("log(", input$checkGroup, ")")
+  })
   output$scatterplot <- renderPlot({
     ames_subset <- subset(ames, Neighborhood==input$neighborhood)
+    if ("X" %in% input$checkGroup) ames_subset$GrLivArea <- log(ames_subset$GrLivArea)
+    if ("Y" %in% input$checkGroup) ames_subset$SalePrice <- log(ames_subset$SalePrice)
     ggplot(data=ames_subset, aes(x=GrLivArea, y=SalePrice)) +
       geom_point() +
       geom_smooth(method="lm") +
-      ggtitle("Scatter plot: Sale Price (USD) vs. Living Area (sqft)", 
-              paste(ames_subset$Neighborhood, ", n=", nrow(ames_subset)))
+      ggtitle("Scatter plot: Sale Price (USD) vs. Living Area (sqft)") +
+      labs(x = if ("X" %in% input$checkGroup) "Log(GrLivArea)" else "GrLivArea",
+           y = if ("Y" %in% input$checkGroup) "Log(SalePrice)" else "SalePrice",
+           subtitle = paste(ames_subset$Neighborhood, ", n =", nrow(ames_subset)))
   })
 }
 
