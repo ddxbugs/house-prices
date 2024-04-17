@@ -20,7 +20,7 @@
 
 # RStudio files
 .Rproj.user/
-project.Rproj
+house-prices.Rproj
 
 # produced vignettes
 vignettes/*.html
