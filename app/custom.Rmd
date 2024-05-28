@@ -1,0 +1,76 @@
+---
+title: "custom"
+output: html_document
+date: "2024-04-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+```{r}
+library(dplyr)
+library(naniar)
+library(ggplot2)
+library(tidyverse)
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+train <- read.csv('../ames/data/train.csv')
+test <- read.csv('../ames/data/test.csv')
+
+head(train)
+str(train)
+
+gg_miss_var(train)
+```
+
+```{r}
+## TODO: Factor variables
+
+numeric_vars <- sapply(train, is.numeric)
+numeric_df <- train[, numeric_vars]
+
+str(numeric_df)
+
+filtered_df <- numeric_df %>% 
+  na.omit()
+
+gg_miss_var(filtered_df)
+  
+```
+
+
+```{r}
+ggplot(data=train, aes(SalePrice, GrLivArea, color=Neighborhood)) + 
+  geom_point(shape=1, size=1) +
+  ggtitle("Scatter plot") +
+  labs(x="Living Area (sqft)", y="Sale Price (USD)")
+```
+```{r}
+
+```
+
+
+
