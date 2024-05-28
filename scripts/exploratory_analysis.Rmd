@@ -1,0 +1,88 @@
+---
+title: "eda"
+author: "ddxbugs"
+date: "2024-05-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+sessionInfo()
+getwd()
+```
+
+## Import data
+```{r}
+data <- read.csv("data/raw/Iowa Housing Market.csv")
+```
+
+## Tidy data
+```{r}
+library(naniar)
+gg_miss_var(data)
+```
+## Transform data
+```{r}
+library(tidyverse)
+
+names(data)
+
+data$LandContour <- factor(data$LandContour)
+data$LotConfig <- factor(data$LotConfig)
+data$Neighborhood <- factor(data$Neighborhood)
+data$BldgType <- factor(data$BldgType)
+data$OverallQual <- factor(data$OverallQual)
+data$OverallCond <- factor(data$OverallCond)
+data$CentralAir <- factor(data$CentralAir)
+data$PavedDrive <- factor(data$PavedDrive)
+
+str(data)
+
+df1 <- data %>%
+  select(Neighborhood, OverallQual, OverallCond, SalePrice)
+
+df2
+```
+
+## EDA
+
+```{r}
+library(GGally)
+library(ggplot2)
+
+plot(df1)
+```
+## Objective 1: Overall Condition + Overall Quality
+```{r}
+fit1 <- lm(SalePrice ~ OverallCond + OverallQual, data=df1)
+
+summary(fit1)
+anova(fit1)
+plot(fit1)
+
+```
+
+

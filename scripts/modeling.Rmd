@@ -1,0 +1,188 @@
+---
+title: "model"
+author: "ddxbugs"
+date: "2024-05-27"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(caret)
+library(ggplot2)
+processed_data <- read_csv("data/processed/processed_dataset.csv")
+```
+
+
+## OBJECTIVE 1
+
+```{r}
+set.seed(1234)
+# Bootstrapping 
+
+
+# Bootstrap 95% CI
+
+# Bagging with Linear Regression
+
+```
+
+
+## OBJECTIVE 2
+```{r}
+# Random Forest Bootstrapping
+
+# Random Forest Bagging
+library(randomForest)
+library(ggplot2)
+
+# Set the simulated data seed
+set.seed(1234)
+
+```
+
+## Bagging with Multiple Linear Regression
+```{r}
+# Load necessary libraries
+library(caret)
+library(ipred)
+
+# Simulate some data
+set.seed(123)
+x <- runif(100, -6, 6.5)
+y <- 2 * x^4 - 2 * x^3 - 50 * x^2 + 100 * x + 2 + rnorm(100, 0, 100)
+data <- data.frame(x = x, y = y)
+
+# Create a formula
+formula <- y ~ poly(x, 4, raw=TRUE)
+
+# Perform Bagging
+set.seed(123)
+bagging_model <- bagging(formula, data = data, nbagg = 50)
+
+# Predict and plot
+preds <- predict(bagging_model, data)
+plot(x, y, main = "Bagging with Linear Regression")
+lines(x, preds, col = "red", lwd = 2)
+
+```
+
+
+## Bootstrapping and Bagging with Random Forest
+```{r}
+# Load necessary libraries
+library(randomForest)
+library(ggplot2)
+
+# Simulate some data
+set.seed(123)
+x <- runif(100, -6, 6.5)
+y <- 2 * x^4 - 2 * x^3 - 50 * x^2 + 100 * x + 2 + rnorm(100, 0, 100)
+data <- data.frame(x = x, y = y)
+
+# Fit Random Forest
+set.seed(123)
+rf_model <- randomForest(y ~ x, data = data, ntree = 500)
+
+# Predict and plot
+preds <- predict(rf_model, data)
+
+# Plot original data and predictions
+ggplot(data, aes(x = x, y = y)) +
+  geom_point() +
+  geom_line(aes(y = preds), color = "blue", size = 1.5) +
+  ggtitle("Random Forest with Bootstrapping and Bagging") +
+  theme_minimal()
+
+```
+
+
+## Bootstrapping with Random Forest Manually
+```{r}
+# Load necessary libraries
+library(caret)
+library(rpart)
+
+# Simulate some data
+set.seed(123)
+x <- runif(100, -6, 6.5)
+y <- 2 * x^4 - 2 * x^3 - 50 * x^2 + 100 * x + 2 + rnorm(100, 0, 100)
+data <- data.frame(x = x, y = y)
+
+# Number of bootstraps
+num_bootstrap <- 50
+
+# Store predictions
+pred_matrix <- matrix(NA, nrow = num_bootstrap, ncol = length(y))
+
+# Perform bootstrapping
+set.seed(123)
+for (i in 1:num_bootstrap) {
+  # Create bootstrap sample
+  boot_indices <- sample(1:nrow(data), replace = TRUE)
+  boot_data <- data[boot_indices, ]
+  
+  # Train decision tree on bootstrap sample
+  tree_model <- rpart(y ~ x, data = boot_data)
+  
+  # Predict on original data
+  pred_matrix[i, ] <- predict(tree_model, newdata = data)
+}
+
+# Aggregate predictions (bagging)
+bagged_preds <- apply(pred_matrix, 2, mean)
+
+# Plot original data and bagged predictions
+ggplot(data, aes(x = x, y = y)) +
+  geom_point() +
+  geom_line(aes(y = bagged_preds), color = "red", size = 1.5) +
+  ggtitle("Bagging with Decision Trees") +
+  theme_minimal()
+```
+
+
+## Ensemble multiple models
+```{r}
+# Load necessary libraries
+library(caret)
+library(glmnet)
+library(randomForest)
+
+# Simulate some data
+set.seed(123)
+x <- runif(100, -6, 6.5)
+y <- 2 * x^4 - 2 * x^3 - 50 * x^2 + 100 * x + 2 + rnorm(100, 0, 100)
+data <- data.frame(x = x, y = y)
+
+# Define training control
+train_control <- trainControl(method = "cv", number = 5, savePredictions = "final")
+
+# List of models to ensemble
+model_list <- caretList(
+  y ~ poly(x, 4, raw=TRUE),
+  data = data,
+  trControl = train_control,
+  methodList = c("lm", "glmnet", "rf")
+)
+
+# Stacking models using linear regression as meta-model
+stack_control <- trainControl(method = "cv", number = 5)
+stacked_model <- caretStack(
+  model_list,
+  method = "glm",
+  trControl = stack_control
+)
+
+# Predict and plot
+preds <- predict(stacked_model, newdata = data)
+ggplot(data, aes(x = x, y = y)) +
+  geom_point() +
+  geom_line(aes(y = preds), color = "green", size = 1.5) +
+  ggtitle("Ensemble (Stacking)") +
+  theme_minimal()
+
+```
+
+
