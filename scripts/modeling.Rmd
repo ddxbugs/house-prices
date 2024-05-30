@@ -18,16 +18,16 @@ processed_data <- read_csv("../data/processed/processed_dataset.csv")
 
 ```{r}
 library(caret)
-library(ggplot2)
+library(glmnet)
 
 set.seed(1234)
 # Bootstrapping 
-
-
 # Bootstrap 95% CI
-
 # Bagging with Linear Regression
 
+train_control <- trainControl(method="cv", number=5)
+model <- train(SalePrice ~ ., data=processed_data, method="lm", trControl=train_control)
+summary(model)
 ```
 
 
