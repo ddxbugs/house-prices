@@ -10,15 +10,16 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-library(caret)
-library(ggplot2)
-processed_data <- read_csv("data/processed/processed_dataset.csv")
+processed_data <- read_csv("../data/processed/processed_dataset.csv")
 ```
 
 
 ## OBJECTIVE 1
 
 ```{r}
+library(caret)
+library(ggplot2)
+
 set.seed(1234)
 # Bootstrapping 
 
