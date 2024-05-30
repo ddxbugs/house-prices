@@ -36,53 +36,33 @@ getwd()
 
 ## Import data
 ```{r}
-data <- read.csv("data/raw/Iowa Housing Market.csv")
+processed_data <- read.csv("../data/processed/processed_data.csv")
 ```
 
-## Tidy data
-```{r}
-library(naniar)
-gg_miss_var(data)
-```
 ## Transform data
 ```{r}
 library(tidyverse)
 
-names(data)
+str(processed_data)
+processed_data$LandContour <- factor(processed_data$LandContour)
+processed_data$LotConfig <- factor(processed_data$LotConfig)
+processed_data$Neighborhood <- factor(processed_data$Neighborhood)
+processed_data$BldgType <- factor(processed_data$BldgType)
+processed_data$OverallQual <- factor(processed_data$OverallQual)
+processed_data$OverallCond <- factor(processed_data$OverallCond)
+processed_data$CentralAir <- factor(processed_data$CentralAir)
+processed_data$PavedDrive <- factor(processed_data$PavedDrive)
 
-data$LandContour <- factor(data$LandContour)
-data$LotConfig <- factor(data$LotConfig)
-data$Neighborhood <- factor(data$Neighborhood)
-data$BldgType <- factor(data$BldgType)
-data$OverallQual <- factor(data$OverallQual)
-data$OverallCond <- factor(data$OverallCond)
-data$CentralAir <- factor(data$CentralAir)
-data$PavedDrive <- factor(data$PavedDrive)
-
-str(data)
-
-df1 <- data %>%
-  select(Neighborhood, OverallQual, OverallCond, SalePrice)
-
-df2
+str(processed_data)
 ```
-
 ## EDA
 
 ```{r}
 library(GGally)
 library(ggplot2)
 
-plot(df1)
-```
-## Objective 1: Overall Condition + Overall Quality
-```{r}
-fit1 <- lm(SalePrice ~ OverallCond + OverallQual, data=df1)
-
-summary(fit1)
-anova(fit1)
-plot(fit1)
+summary(processed_data)
+plot(processed_data)
 
 ```
-
 
