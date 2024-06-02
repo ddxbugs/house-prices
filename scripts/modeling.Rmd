@@ -13,41 +13,109 @@ knitr::opts_chunk$set(echo = TRUE)
 sessionInfo()
 getwd()
 
+set.seed(1234)
+
+if (!require(caret)) install.packages("caret")
+if (!require(caret)) install.packages("lmboot")
+if (!require(caret)) install.packages("glmnet")
+if (!require(caret)) install.packages("olsrr")
+if (!require(caret)) install.packages("car")
 library(caret)
 library(glmnet)
 library(olsrr)
+library(car)
+library(lmboot)
 ```
 
-
+## Import the data
 ```{r}
 processed_data <- read.csv("../data/processed/processed_data.csv")
 ```
 
+## Transform the data
+```{r}
+transformed_data <- processed_data %>%
+  mutate(SalePrice=log(SalePrice))
+```
+
+## Feature Selection
+```{r}
+ols_step_backward_p(fit, prem=0.05, details=FALSE)
+ols_step_forward_p(fit, penter=0.05, details=FALSE)
+ols_step_both_p(fit, prem=0.05, penter=0.05, details=TRUE)
+```
 
 ## OBJECTIVE 1
-
 ```{r}
-set.seed(1234)
+
 # Bootstrapping 
 # Bootstrap 95% CI
 # Bagging with Linear Regression
 
 train_control <- trainControl(method="cv", number=5)
-model <- train(SalePrice ~ ., data=processed_data, method="lm", trControl=train_control)
+model <- train(SalePrice ~ ., data=transformed_data, method="lm", trControl=train_control)
 summary(model)
+
+stepwise_model <- train(SalePrice ~ OverallQual + X1stFlrSF + X2ndFlrSF + YearBuilt + OverallCond + Fireplaces + CentralAir + BldgType + Neighborhood + LandContour + TotRmsAbvGrd, data=transformed_data, method="lm", trControl=train_control)
+summary(stepwise_model)
+
+```
+
+## Fit a model
+```{r}
+fit <- lm(SalePrice~., data=transformed_data)
+summary(fit)
+anova(fit)
+confint(fit)
+plot(fit)
+hist(fit$residuals, main="Histogram of Residuals", xlab="Residuals")
+vif(fit)
+barplot(vif(fit), main="VIF Values", horiz=TRUE, col="lightblue")
 ```
 
 ```{r}
-fit <- lm(SalePrice~., data=processed_data)
-plot(fit)
-ols_step_backward_p(fit, prem=0.05, details=TRUE)
-ols_step_forward_p(fit, penter=0.05, details=TRUE)
-ols_step_both_p(fit, prem=0.05, penter=0.05, details=FALSE)
+stepwise_fit <- lm(SalePrice ~ OverallQual + X1stFlrSF + X2ndFlrSF + YearBuilt + OverallCond + Fireplaces + CentralAir + BldgType + Neighborhood + LandContour + TotRmsAbvGrd, data=transformed_data)
+summary(stepwise_fit)
+anova(stepwise_fit)
+plot(stepwise_fit)
+hist(stepwise_fit$residuals, breaks="Sturges", main="Histogram of Residuals", xlab="Residuals")
+vif(stepwise_fit)
+barplot(vif(fit), main="VIF Values", horiz=TRUE, col="lightblue")
 ```
+
+
 
 
 
 ## OBJECTIVE 2
+
+# Bootstrapping
+```{r}
+
+# Take a sample of 30 observations to estimate median of population
+boot.sample <- sample(transformed_data, 100, replace=TRUE)
+hist(boot.sample$SalePrice)
+median(boot.sample$SalePrice)
+# Compute the bootstrap sampling distribution of the median
+medians <- c()
+B <- 2000
+for (i in 1:B) {
+  b.sample <- sample(preprocessed_data$SalePrice, 30, replace=TRUE)
+  medians[i] <- median(b.sample)
+}
+hist(medians, main="Bootstrap Sampling Distribution", xlab="Median Sale Price ($ USD)")
+
+# Obtain SE of median 
+sd(medians)
+
+boot.p <- paired.boot(SalePrice~., data=transformed_data, B=2000, seed=1234)
+# Obtain bootstrap percentile CI for each coefficient
+apply(boot.p$bootEstParam, 2, quantile, probs=c(0.025, 0.975))
+
+boot.res <- residual.boot(SalePrice~., data=transformed_data, B=2000, seed=1234)
+apply(boot.res$bootEstParam, 2, quantile, probs=c(0.025, 0.975))
+```
+
 ```{r}
 knnControl <- trainControl(method="repeatedcv", number=10, repeats=1)
 knn.fit <- train(SalePrice~., data=processed_data, method="knn", trControl=knnControl)
