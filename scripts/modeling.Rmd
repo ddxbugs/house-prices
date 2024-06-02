@@ -2,7 +2,9 @@
 title: "model"
 author: "ddxbugs"
 date: "2024-05-27"
-output: word_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -269,10 +271,12 @@ sd(medians)
 # 95% confidence interval
 quantile(medians, probs=c(0.025,0.975))
 
+# Paired bootstrapping 
 boot.p <- paired.boot(log(SalePrice)~., data=transformed_data, B=2000, seed=1234)
 # Obtain bootstrap percentile CI for each coefficient
 apply(boot.p$bootEstParam, 2, quantile, probs=c(0.025, 0.975))
 
+# Residual bootstrapping (homoscedasticity)
 boot.res <- residual.boot(log(SalePrice)~., data=transformed_data, B=2000, seed=1234)
 apply(boot.res$bootEstParam, 2, quantile, probs=c(0.025, 0.975))
 ```
@@ -302,16 +306,16 @@ sd(xbar)
 ## K-fold Cross Validation 
 ```{r}
 # Create dummy variable for categorical predictors
-dummy_data <- model.matrix(SalePrice~., data=transformed_data)
+dummy_data <- model.matrix(log(SalePrice)~., data=transformed_data)
 
 # Split data into predictor (x) and response (y)
 x <- dummy_data
-y <- transformed_data$SalePrice
+y <- log(transformed_data$SalePrice)
 data_combined <- as.data.frame(cbind(x, SalePrice = y))
 
 # Set K-fold parameters
 knnControl <- trainControl(method="repeatedcv", number=10, repeats=1)
-knn.fit <- train(SalePrice~., 
+knn.fit <- train(log(SalePrice)~., 
                  data=data_combined, 
                  method="knn", 
                  trControl=knnControl, 
@@ -323,12 +327,15 @@ knn.fit
 ## Bagging with Multiple Linear Regression
 ```{r}
 # Perform Bagging
-bagged_model <- bagging(log(SalePrice)~., data=transformed_data, nbagg=50)
+bagged_model <- bagging(log(SalePrice)~., data=transformed_data, nbagg=1)
 
 # Predict and plot
 predictions <- predict(bagged_model, transformed_data)
 plot(transformed_data$X1stFlrSF, log(transformed_data$SalePrice), main = "Bagging with Linear Regression")
 lines(transformed_data$X1stFlrSF, predictions, col = "red", lwd = 2)
+
+plot(transformed_data$OverallQual, log(transformed_data$SalePrice), main = "Bagging with Linear Regression")
+lines(transformed_data$OverallQual, predictions, col = "red", lwd = 2)
 
 ```
 
