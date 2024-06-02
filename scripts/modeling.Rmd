@@ -10,16 +10,23 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-processed_data <- read_csv("../data/processed/processed_dataset.csv")
+sessionInfo()
+getwd()
+
+library(caret)
+library(glmnet)
+library(olsrr)
+```
+
+
+```{r}
+processed_data <- read.csv("../data/processed/processed_data.csv")
 ```
 
 
 ## OBJECTIVE 1
 
 ```{r}
-library(caret)
-library(glmnet)
-
 set.seed(1234)
 # Bootstrapping 
 # Bootstrap 95% CI
@@ -30,8 +37,32 @@ model <- train(SalePrice ~ ., data=processed_data, method="lm", trControl=train_
 summary(model)
 ```
 
+```{r}
+fit <- lm(SalePrice~., data=processed_data)
+plot(fit)
+ols_step_backward_p(fit, prem=0.05, details=TRUE)
+ols_step_forward_p(fit, penter=0.05, details=TRUE)
+ols_step_both_p(fit, prem=0.05, penter=0.05, details=FALSE)
+```
+
+
 
 ## OBJECTIVE 2
+```{r}
+knnControl <- trainControl(method="repeatedcv", number=10, repeats=1)
+knn.fit <- train(SalePrice~., data=processed_data, method="knn", trControl=knnControl)
+plot(knn.fit)
+knn.fit
+```
+```{r}
+pred <- predict(knn.fit, predictors)
+pred.surface <- matrix(preds, 301, 51)
+plot3d()
+surface3d()
+```
+
+
+
 ```{r}
 # Random Forest Bootstrapping
 
@@ -77,15 +108,9 @@ lines(x, preds, col = "red", lwd = 2)
 library(randomForest)
 library(ggplot2)
 
-# Simulate some data
-set.seed(123)
-x <- runif(100, -6, 6.5)
-y <- 2 * x^4 - 2 * x^3 - 50 * x^2 + 100 * x + 2 + rnorm(100, 0, 100)
-data <- data.frame(x = x, y = y)
-
 # Fit Random Forest
 set.seed(123)
-rf_model <- randomForest(y ~ x, data = data, ntree = 500)
+rf_model <- randomForest(SalePrice ~ ., data = processed_data, ntree = 500)
 
 # Predict and plot
 preds <- predict(rf_model, data)
