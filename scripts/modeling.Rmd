@@ -356,31 +356,31 @@ ggplot(transformed_data_long, aes(x=Value, y=SalePrice)) +
 ## Ensemble multiple models
 ```{r}
 # Define training control
-ensembleControl <- trainControl(method = "cv", number = 5, savePredictions = "final")
-
-# List of models to ensemble
-model_list <- caretList(
-  SalePrice~.,
-  data = transformed_data,
-  trControl = ensembleControl,
-  methodList = c("lm", "glmnet", "rf")
-)
-
-# Stacking models using linear regression as meta-model
-stackControl <- trainControl(method = "cv", number = 5)
-stacked_model <- caretStack(
-  model_list,
-  method = "glm",
-  trControl = stackControl
-)
-
-# Predict and plot
-predictions <- predict(stacked_model, newdata = transformed_data)
-ggplot(data, aes(x = x, y = y)) +
-  geom_point() +
-  geom_line(aes(y = predictions), color = "green", size = 1.5) +
-  ggtitle("Ensemble (Stacking)") +
-  theme_minimal()
+# ensembleControl <- trainControl(method = "cv", number = 5, savePredictions = "final")
+# 
+# # List of models to ensemble
+# model_list <- caretList(
+#   SalePrice~.,
+#   data = transformed_data,
+#   trControl = ensembleControl,
+#   methodList = c("lm", "glmnet", "rf")
+# )
+# 
+# # Stacking models using linear regression as meta-model
+# stackControl <- trainControl(method = "cv", number = 5)
+# stacked_model <- caretStack(
+#   model_list,
+#   method = "glm",
+#   trControl = stackControl
+# )
+# 
+# # Predict and plot
+# predictions <- predict(stacked_model, newdata = transformed_data)
+# ggplot(data, aes(x = x, y = y)) +
+#   geom_point() +
+#   geom_line(aes(y = predictions), color = "green", size = 1.5) +
+#   ggtitle("Ensemble (Stacking)") +
+#   theme_minimal()
 
 ```
 
