@@ -9,60 +9,118 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Session info
 
 ```{r}
 sessionInfo()
 getwd()
+
+library(caret)
+library(rgl)
+library(FNN)
 ```
 
 ## Import data
 ```{r}
 processed_data <- read.csv("../data/processed/processed_data.csv")
+attach(processed_data)
+
+View(processed_data)
+summary(processed_data)
+head(processed_data, n=5)
+tail(processed_data, n=5)
 ```
 
 ## Transform data
 ```{r}
 library(tidyverse)
 
-str(processed_data)
 processed_data$LandContour <- factor(processed_data$LandContour)
 processed_data$LotConfig <- factor(processed_data$LotConfig)
 processed_data$Neighborhood <- factor(processed_data$Neighborhood)
 processed_data$BldgType <- factor(processed_data$BldgType)
-processed_data$OverallQual <- factor(processed_data$OverallQual)
-processed_data$OverallCond <- factor(processed_data$OverallCond)
+#processed_data$OverallQual <- factor(processed_data$OverallQual)
+#processed_data$OverallCond <- factor(processed_data$OverallCond)
+#processed_data$YearBuilt <- factor(processed_data$YearBuilt)
 processed_data$CentralAir <- factor(processed_data$CentralAir)
 processed_data$PavedDrive <- factor(processed_data$PavedDrive)
 
 str(processed_data)
-```
-## EDA
 
+numeric_data <- processed_data[, sapply(processed_data, is.numeric)]
+
+```
+## Descriptive Statistics
+```{r}
+summary_data <- processed_data %>%
+  group_by(Neighborhood) %>%
+  summarize(
+    AvgSalePrice=mean(SalePrice, na.rm=TRUE),
+    Count=n()
+  )
+print(summary_data)
+```
+
+## Data visualization
 ```{r}
 library(GGally)
 library(ggplot2)
+library(tidyverse)
+library(scales)
 
-summary(processed_data)
-plot(processed_data)
+# plot3d(OverallCond, OverallQual, SalePrice)
 
+# Count
+processed_data %>%
+  group_by(Neighborhood) %>%
+  mutate(AvgSalePrice=mean(SalePrice), AvgCond=mean(OverallCond), AvgQual=mean(OverallQual), Count=n()) %>%
+  ggplot(aes(AvgCond, AvgQual, color=Neighborhood, size=Count)) + geom_point() +
+  geom_text(aes(label=Neighborhood), vjust=2, size=3) +
+  labs(title="Average Condition vs. Quality by Neighborhood Size", x="Average Condition", y="Average Quality") +
+  theme_minimal() + 
+  theme(
+    axis.text.x=element_text(size=10),
+    axis.title=element_text(size=10),
+    plot.title=element_text(hjust=0.5, size=12)
+  )
+# Average Sale Price
+processed_data %>%
+  group_by(Neighborhood) %>%
+  mutate(AvgSalePrice=mean(SalePrice), AvgCond=mean(OverallCond), AvgQual=mean(OverallQual)) %>%
+  ggplot(aes(AvgCond, AvgQual, color=Neighborhood, size=AvgSalePrice)) + geom_point() + 
+  geom_text(aes(label=Neighborhood), vjust=2, size=3) +
+  labs(title="Average Condition vs Quality by Sale Price", x="Average Condition", y="Average Quality") +
+  theme_minimal() + 
+  theme(
+    axis.text.x=element_text(size=10),
+    axis.title=element_text(size=10),
+    plot.title=element_text(hjust=0.5, size=12)
+  )
+
+# LotConfig
+ggplot(data=processed_data, mapping=aes(LotConfig, SalePrice, fill=LotConfig)) + geom_boxplot(color="black") + 
+  scale_y_continuous(labels=comma) + theme(axis.text.y=element_text(size=12, angle=0, hjust=1)) +
+  labs(title="Boxplot of Sale Price by Lot Configuration ($ USD)")
+
+# SalePrice
+ggplot(data=processed_data, mapping=aes(SalePrice)) + geom_histogram(binwidth=10000, fill="blue", color="black") + 
+  scale_x_continuous(labels=comma) + theme(axis.text.x=element_text(size=12, angle=45, hjust=1)) +
+  labs(title="Histogram of Home Sale Price ($ USD)")
+
+# X1stFlrSF
+processed_data %>% ggplot(aes(X1stFlrSF, SalePrice)) + geom_point() + geom_smooth(method="lm")
+
+# YearBuilt
+processed_data %>% ggplot(aes(YearBuilt)) + geom_histogram(stat="count", fill="blue", color="black") +
+  theme(axis.text.x=element_text(size=5, angle=45, hjust=1)) +
+  labs(title="Histogram of Year Built (YYYY)") + xlab("Year Built") + ylab("Frequency")
+
+
+```
+
+## Correlation analysis
+```{r}
+cor.test(processed_data$OverallCond, processed_data$SalePrice)
+cor.test(processed_data$OverallQual, processed_data$SalePrice)
 ```
 
