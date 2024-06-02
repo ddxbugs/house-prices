@@ -16,13 +16,16 @@ getwd()
 set.seed(1234)
 
 if (!require(caret)) install.packages("caret")
-if (!require(caret)) install.packages("lmboot")
-if (!require(caret)) install.packages("glmnet")
-if (!require(caret)) install.packages("olsrr")
-if (!require(caret)) install.packages("car")
-if (!require(caret)) install.packages("boot")
-if (!require(caret)) install.packages("gridExtra")
-if (!require(caret)) install.packages("scales")
+if (!require(lmboot)) install.packages("lmboot")
+if (!require(glmnet)) install.packages("glmnet")
+if (!require(olsrr)) install.packages("olsrr")
+if (!require(car)) install.packages("car")
+if (!require(boot)) install.packages("boot")
+if (!require(gridExtra)) install.packages("gridExtra")
+if (!require(scales)) install.packages("scales")
+if (!require(ipred)) install.packages("ipred")
+if (!require(randomForest)) install.packages("randomForest")
+if (!require(caretEnsemble)) install.packages("caretEnsemble")
 library(caret)
 library(glmnet)
 library(olsrr)
@@ -31,6 +34,9 @@ library(lmboot)
 library(boot)
 library(gridExtra)
 library(scales)
+library(ipred)
+library(randomForest)
+library(caretEnsemble)
 ```
 
 ## Import the data
@@ -64,6 +70,7 @@ tot_rms_abv_grd <- processed_data %>% distinct(TotRmsAbvGrd) %>% pull(TotRmsAbvG
 fireplaces <- processed_data %>% distinct(Fireplaces) %>% pull(Fireplaces)
 paved_drive <- processed_data %>% distinct(PavedDrive) %>% pull(PavedDrive)
 
+# Create transformed data set 
 transformed_data <- processed_data %>% select(-X)
 
 # Define the list of predictors
@@ -74,7 +81,9 @@ predictors <- c("LandContour", "LotConfig", "Neighborhood", "BldgType",
 
 ## Build a model
 ```{r}
-fit <- lm(SalePrice~., data=transformed_data)
+#fit <- lm(SalePrice~., data=transformed_data)
+#fit <- lm(log(SalePrice)~., data=transformed_data)
+fit <- lm(log(SalePrice)~., data=transformed_data)
 summary(fit)
 anova(fit)
 confint(fit)
@@ -119,11 +128,7 @@ barplot(vif(reduced_fit), main="VIF Values", horiz=TRUE, col="lightblue")
 
 ## OBJECTIVE 1
 ```{r}
-
-# Bootstrapping 
-# Bootstrap 95% CI
-# Bagging with Linear Regression
-
+# Bootstrapping linear regression model
 lmControl <- trainControl(method="cv", number=5)
 
 full_model <- train(log(SalePrice)~., data=transformed_data, method="lm", trControl=lmControl)
@@ -148,21 +153,36 @@ glmnet.fit <- train(log(SalePrice)~., data=transformed_data, method="glmnet", tr
 glmnet.fit
 plot(glmnet.fit)
 
+plot(glmnet.fit$finalModel, xvar="lambda", label=TRUE)
+
 # Investigate penalty term coefficients
 opt.pen <- glmnet.fit$finalModel$lambdaOpt
 coef(glmnet.fit$finalModel, opt.pen)
 
-# LASSO
+# Create dummy variable for categorical predictors
+dummy_data <- model.matrix(SalePrice~.-1, data=transformed_data)
+
+# Split data into predictor (x) and response (y)
+x <- dummy_data
+y <- transformed_data$SalePrice
 grid <- 10^seq(10, -2, length=100)
-lasso.mod <- glmnet(transformed_data[,-SalePrice], log(SalePrice), alpha=1, lambda=grid)
-cv.out <- cv.glmnet(transformed_data[,-SalePrice], log(SalePrice), alpha=1)
+
+# LASSO
+lasso.mod <- glmnet(x, y, alpha=1, lambda=grid)
+cv.out <- cv.glmnet(x, y, alpha=1)
 plot(cv.out)
-best_lambda <- cv.ouit$lamdba.1se
+best_lambda <- cv.out$lamdba.1se
 coef(cv.out, s=best_lambda)
 
-plot(glmnet.fit$finalModel, xvar="lambda", label=TRUE)
+# RIDGE
+ridge.mod <- glmnet(x, y, alpha=0, lambda=grid)
+cv.out <- cv.glmnet(x, y, alpha=0)
+plot(cv.out)
+best_lambda <- cv.out$lambda.1se
+coef(cv.out, s=best_lambda)
+
 ```
-# Bootstrapping
+# Bootstrapping descriptive statistic
 ```{r}
 # Boot function calculates median Sale Price
 median.func <- function(x, i) {
@@ -249,11 +269,11 @@ sd(xbar)
 #)
 
 # Set K-fold parameters
-knn_Control <- trainControl(method="repeatedcv", number=10, repeats=1)
-knn.fit <- train(log(SalePrice)~., 
+knnControl <- trainControl(method="repeatedcv", number=10, repeats=1)
+knn.fit <- train(SalePrice~., 
                  data=transformed_data, 
                  method="knn", 
-                 trControl=knn_Control, 
+                 trControl=knnControl, 
                  tuneGrid=expand.grid(k=c(1:10, 20, 30)))
 plot(knn.fit)
 knn.fit
@@ -263,44 +283,26 @@ prediction.surface <- matrix(predictions, 301, 51)
 surface3d(0:300, 0:50, prediction.surface, alpha=0.4)
 ```
 
-```{r}
-# Random Forest Bootstrapping
-
-# Random Forest Bagging
-library(randomForest)
-library(ggplot2)
-
-# Set the simulated data seed
-set.seed(1234)
-
-```
-
 ## Bagging with Multiple Linear Regression
 ```{r}
-# Load necessary libraries
-library(caret)
-library(ipred)
-
 # Create a formula
-formula <- log(SalePrice)~X1stFlrSF
+formula <- SalePrice~.
+# Set up train control for bagging
+bootControl <- trainControl(method="boot", number=25)
 
 # Perform Bagging
-bagging_model <- bagging(formula, data = transformed_data, nbagg = 50)
+bagged_model <- bagging(formula, data = transformed_data, method="lm", trControl=bootControl, nbagg = 1)
 
 # Predict and plot
-preds <- predict(bagging_model, transformed_data)
-plot(X1stFlrSF, log(SalePrice), main = "Bagging with Linear Regression")
-lines(X1stFlrSF, preds, col = "red", lwd = 2)
+predictions <- predict(bagging_model, transformed_data)
+plot(X1stFlrSF, SalePrice, main = "Bagging with Linear Regression")
+lines(X1stFlrSF, predictions, col = "red", lwd = 2)
 
 ```
 
 
 ## Bootstrapping and Bagging with Random Forest
 ```{r}
-# Load necessary libraries
-library(randomForest)
-library(ggplot2)
-
 # Fit Random Forest
 rf_model <- randomForest(SalePrice~., data = transformed_data, ntree = 500)
 # Print model summary
@@ -316,20 +318,7 @@ transformed_data$Predictions <- predict(rf_model, transformed_data)
 # Confusion matrix
 table(predictions, transformed_data$SalePrice)
 
-# # Create individual plots for each predictor
-# plot_list <- lapply(predictors, function(predictor) {
-#   ggplot(transformed_data, aes_string(x = predictor, y = "SalePrice")) +
-#     geom_point() +
-#     geom_line(aes_string(y = "Predictions"), color = "blue") +
-#     labs(title = paste(predictor, "vs SalePrice"),
-#          x = predictor,
-#          y = "SalePrice") +
-#     theme_minimal()
-# })
-# 
-# # Arrange all plots in a grid
-# do.call(grid.arrange, c(plot_list, ncol = 2))
-
+# Transform data frame long 
 transformed_data_long <- transformed_data %>%
     gather(key="Predictor", value="Value", -SalePrice, -Predictions)
 
@@ -343,58 +332,53 @@ ggplot(transformed_data_long, aes(x=Value, y=SalePrice)) +
        y="Sale Price ($ USD)") +
   theme_minimal()
 
-# Plot original data and predictions individually
-ggplot(transformed_data, aes(x = OverallCond, y = SalePrice)) +
-  geom_point() +
-  geom_line(aes(y = predictions), color = "blue", size = 1.5) +
-  ggtitle("Random Forest with Bootstrapping and Bagging") +
-  theme_minimal()
-
-ggplot(transformed_data, aes(x = OverallQual, y = SalePrice)) +
-  geom_point() +
-  geom_line(aes(y = predictions), color = "blue", size = 1.5) +
-  ggtitle("Random Forest with Bootstrapping and Bagging") +
-  theme_minimal()
-
-ggplot(transformed_data, aes(x = X1stFlrSF, y = SalePrice)) +
-  geom_point() +
-  geom_line(aes(y = predictions), color = "blue", size = 1.5) +
-  ggtitle("Random Forest with Bootstrapping and Bagging") +
-  theme_minimal()
+# # Plot original data and predictions individually
+# ggplot(transformed_data, aes(x = OverallCond, y = SalePrice)) +
+#   geom_point() +
+#   geom_line(aes(y = predictions), color = "blue", size = 1.5) +
+#   ggtitle("Random Forest with Bootstrapping and Bagging") +
+#   theme_minimal()
+# 
+# ggplot(transformed_data, aes(x = OverallQual, y = SalePrice)) +
+#   geom_point() +
+#   geom_line(aes(y = predictions), color = "blue", size = 1.5) +
+#   ggtitle("Random Forest with Bootstrapping and Bagging") +
+#   theme_minimal()
+# 
+# ggplot(transformed_data, aes(x = X1stFlrSF, y = SalePrice)) +
+#   geom_point() +
+#   geom_line(aes(y = predictions), color = "blue", size = 1.5) +
+#   ggtitle("Random Forest with Bootstrapping and Bagging") +
+#   theme_minimal()
 
 ```
 
 ## Ensemble multiple models
 ```{r}
-# Load necessary libraries
-library(caret)
-library(glmnet)
-library(randomForest)
-
 # Define training control
 ensembleControl <- trainControl(method = "cv", number = 5, savePredictions = "final")
 
 # List of models to ensemble
 model_list <- caretList(
-  log(SalePrice)~.,
+  SalePrice~.,
   data = transformed_data,
   trControl = ensembleControl,
   methodList = c("lm", "glmnet", "rf")
 )
 
 # Stacking models using linear regression as meta-model
-stack_control <- trainControl(method = "cv", number = 5)
+stackControl <- trainControl(method = "cv", number = 5)
 stacked_model <- caretStack(
   model_list,
   method = "glm",
-  trControl = stack_control
+  trControl = stackControl
 )
 
 # Predict and plot
-preds <- predict(stacked_model, newdata = data)
+predictions <- predict(stacked_model, newdata = transformed_data)
 ggplot(data, aes(x = x, y = y)) +
   geom_point() +
-  geom_line(aes(y = preds), color = "green", size = 1.5) +
+  geom_line(aes(y = predictions), color = "green", size = 1.5) +
   ggtitle("Ensemble (Stacking)") +
   theme_minimal()
 
