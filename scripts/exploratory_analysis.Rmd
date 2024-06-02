@@ -15,9 +15,16 @@ knitr::opts_chunk$set(echo = TRUE)
 sessionInfo()
 getwd()
 
+if (!require(caret)) install.packages("caret")
+if (!require(tidyr)) install.packages("rgl")
+if (!require(tidyr)) install.packages("FNN")
+if (!require(tidyr)) install.packages("corrr")
+if (!require(tidyr)) install.packages("corrplot")
 library(caret)
 library(rgl)
 library(FNN)
+library(corrr)
+library(corrplot)
 ```
 
 ## Import data
@@ -56,6 +63,9 @@ summary_data <- processed_data %>%
   group_by(Neighborhood) %>%
   summarize(
     AvgSalePrice=mean(SalePrice, na.rm=TRUE),
+    MedianSalePrice=median(SalePrice, na.rm=TRUE),
+    MinSalePrice=min(SalePrice, na.rm=TRUE),
+    MaxSalePrice=max(SalePrice, na.rm=TRUE),
     Count=n()
   )
 print(summary_data)
@@ -68,7 +78,10 @@ library(ggplot2)
 library(tidyverse)
 library(scales)
 
-# plot3d(OverallCond, OverallQual, SalePrice)
+
+pairs(numeric_data, main="Matrix")
+
+plot3d(OverallCond, OverallQual, SalePrice)
 
 # Count
 processed_data %>%
@@ -105,10 +118,12 @@ ggplot(data=processed_data, mapping=aes(LotConfig, SalePrice, fill=LotConfig)) +
 # SalePrice
 ggplot(data=processed_data, mapping=aes(SalePrice)) + geom_histogram(binwidth=10000, fill="blue", color="black") + 
   scale_x_continuous(labels=comma) + theme(axis.text.x=element_text(size=12, angle=45, hjust=1)) +
-  labs(title="Histogram of Home Sale Price ($ USD)")
+  labs(title="Histogram of Home Sale Price", x="Sale Price ($USD)", y="Frequency")
 
 # X1stFlrSF
-processed_data %>% ggplot(aes(X1stFlrSF, SalePrice)) + geom_point() + geom_smooth(method="lm")
+processed_data %>% ggplot(aes(X1stFlrSF, SalePrice)) + geom_point() + geom_smooth(method="lm") + 
+  scale_x_continuous(labels=comma) + theme(axis.text.x=element_text(size=12, angle=45, hjust=1)) +
+  labs(title="1st Floor Square Feet vs. Sale Price", x="1st Floor (sq. ft.)", y="Sale Price ($USD)")
 
 # YearBuilt
 processed_data %>% ggplot(aes(YearBuilt)) + geom_histogram(stat="count", fill="blue", color="black") +
@@ -120,7 +135,8 @@ processed_data %>% ggplot(aes(YearBuilt)) + geom_histogram(stat="count", fill="b
 
 ## Correlation analysis
 ```{r}
-cor.test(processed_data$OverallCond, processed_data$SalePrice)
-cor.test(processed_data$OverallQual, processed_data$SalePrice)
+
+corr_matrix <- correlate(processed_data)
+print(corr_matrix)
 ```
 
