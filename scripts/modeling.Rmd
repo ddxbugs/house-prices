@@ -56,6 +56,8 @@ overall_qual <- processed_data %>% distinct(OverallQual) %>% pull(OverallQual)
 overall_cond <- processed_data %>% distinct(OverallCond) %>% pull(OverallCond)
 year_built <- processed_data %>% distinct(YearBuilt) %>% pull(YearBuilt)
 central_air <- processed_data %>% distinct(CentralAir) %>% pull(CentralAir)
+tot_rms_abv_grd <- processed_data %>% distinct(TotRmsAbvGrd) %>% pull(TotRmsAbvGrd)
+fireplaces <- processed_data %>% distinct(Fireplaces) %>% pull(Fireplaces)
 paved_drive <- processed_data %>% distinct(PavedDrive) %>% pull(PavedDrive)
 
 transformed_data <- processed_data %>% select(-X)
@@ -190,22 +192,38 @@ sd(xbar)
 ## K-fold Cross Validation 
 ```{r}
 # Quick fit K=1 and K=30
-predictors <- expand.grid(
-  LandContour=land_contour,
-  LotConfig=lot_config,
-  Neighborhood=neighborhood,
-  BldgType=bldg_type,
-  OverallQual=overall_qual,
-  YearBuilt=seq(min(transformed_data$YearBuilt), max(transformed_data$YearBuilt), length.out = 50)
+predictors <- data.frame(
+  #LandContour=land_contour,
+  #LotConfig=lot_config,
+  #Neighborhood=neighborhood,
+  #BldgType=bldg_type,
+  #OverallQual=overall_qual,
+  #OverallCond=overall_cond,
+  #OverallQual=seq(min(transformed_data$OverallQual), max(transformed_data$OverallQual), length.out = 50),
+  #OverallCond=seq(min(transformed_data$OverallCond), max(transformed_data$OverallCond), length.out = 50),
+  #YearBuilt=seq(min(transformed_data$YearBuilt), max(transformed_data$YearBuilt), length.out = 50),
+  #CentralAir=central_air,
+  #X1stFlrSF=seq(min(transformed_data$X1stFlrSF), max(transformed_data$X1stFlrSF), length.out = 50)
+  #X2ndFlrSF=seq(min(transformed_data$X2ndFlrSF), max(transformed_data$X2ndFlrSF), length.out = 50),
+  #TotRmsAbvGrd=tot_rms_abv_grd,
+  #TotRmsAbvGrd=seq(min(transformed_data$TotRmsAbvGrd), max(transformed_data$TotRmsAbvGrd), length.out = 50),
+  #Fireplaces=fireplaces,
+  #PavedDrive=paved_drive
 )
 
 # Set K-fold parameters
 knn_Control <- trainControl(method="repeatedcv", number=10, repeats=1)
-knn.fit <- train(log(SalePrice)~., data=transformed_data, method="knn", trControl=knn_Control)
+knn.fit <- train(log(SalePrice)~., 
+                 data=transformed_data, 
+                 method="knn", 
+                 trControl=knn_Control, 
+                 tuneGrid=expand.grid(k=c(1:10, 20, 30)))
 plot(knn.fit)
 knn.fit
 
-predictions <- predict(knn.fit, )
+predictions <- predict(knn.fit, predictors)
+prediction.surface <- matrix(predictions, 301, 51)
+surface3d(0:300, 0:50, prediction.surface, alpha=0.4)
 ```
 
 ```{r}
