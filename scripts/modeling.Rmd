@@ -36,8 +36,29 @@ processed_data <- read.csv("../data/processed/processed_data.csv")
 
 ## Transform the data
 ```{r}
-transformed_data <- processed_data %>%
-  select(-X)
+# Factorize variable data types
+processed_data$LandContour <- factor(processed_data$LandContour)
+processed_data$LotConfig <- factor(processed_data$LotConfig)
+processed_data$Neighborhood <- factor(processed_data$Neighborhood)
+processed_data$BldgType <- factor(processed_data$BldgType)
+#processed_data$OverallQual <- factor(processed_data$OverallQual)
+#processed_data$OverallCond <- factor(processed_data$OverallCond)
+#processed_data$YearBuilt <- factor(processed_data$YearBuilt)
+processed_data$CentralAir <- factor(processed_data$CentralAir)
+processed_data$PavedDrive <- factor(processed_data$PavedDrive)
+
+# Store distinct data type values
+land_contour <- processed_data %>% distinct(LandContour) %>% pull(LandContour)
+lot_config <- processed_data %>% distinct(LotConfig) %>% pull(LotConfig)
+neighborhood <- processed_data %>% distinct(Neighborhood) %>% pull(Neighborhood)
+bldg_type <- processed_data %>% distinct(BldgType) %>% pull(BldgType)
+overall_qual <- processed_data %>% distinct(OverallQual) %>% pull(OverallQual)
+overall_cond <- processed_data %>% distinct(OverallCond) %>% pull(OverallCond)
+year_built <- processed_data %>% distinct(YearBuilt) %>% pull(YearBuilt)
+central_air <- processed_data %>% distinct(CentralAir) %>% pull(CentralAir)
+paved_drive <- processed_data %>% distinct(PavedDrive) %>% pull(PavedDrive)
+
+transformed_data <- processed_data %>% select(-X)
 ```
 
 ## Build a model
@@ -89,6 +110,19 @@ summary(stepwise_model)
 
 ## OBJECTIVE 2
 
+# GLMNET
+```{r}
+# Set k-fold parameters
+glm_Control <- trainControl(method="repeatedcv", number=5, repeats=1)
+# Fit GLMNET
+glmnet.fit <- train(log(SalePrice)~., data=transformed_data, method="glmnet", trControl=glm_Control)
+glmnet.fit
+plot(glmnet.fit)
+
+# Investigate penalty term coefficients
+opt.pen <- glmnet.fit$finalModel$lambdaOpt
+coef(glmnet.fit$finalModel, opt.pen)
+```
 # Bootstrapping
 ```{r}
 # Boot function calculates median Sale Price
@@ -153,13 +187,27 @@ sd(transformed_data$SalePrice)/sqrt(30)
 sd(xbar)
 ```
 
-
+## K-fold Cross Validation 
 ```{r}
-knnControl <- trainControl(method="repeatedcv", number=10, repeats=1)
-knn.fit <- train(SalePrice~., data=processed_data, method="knn", trControl=knnControl)
+# Quick fit K=1 and K=30
+predictors <- expand.grid(
+  LandContour=land_contour,
+  LotConfig=lot_config,
+  Neighborhood=neighborhood,
+  BldgType=bldg_type,
+  OverallQual=overall_qual,
+  YearBuilt=seq(min(transformed_data$YearBuilt), max(transformed_data$YearBuilt), length.out = 50)
+)
+
+# Set K-fold parameters
+knn_Control <- trainControl(method="repeatedcv", number=10, repeats=1)
+knn.fit <- train(log(SalePrice)~., data=transformed_data, method="knn", trControl=knn_Control)
 plot(knn.fit)
 knn.fit
+
+predictions <- predict(knn.fit, )
 ```
+
 ```{r}
 pred <- predict(knn.fit, predictors)
 pred.surface <- matrix(preds, 301, 51)
