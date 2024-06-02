@@ -327,7 +327,7 @@ knn.fit
 ## Bagging with Multiple Linear Regression
 ```{r}
 # Perform Bagging
-bagged_model <- bagging(log(SalePrice)~., data=transformed_data, nbagg=1)
+bagged_model <- bagging(log(SalePrice)~., data=transformed_data, nbagg=50)
 
 # Predict and plot
 predictions <- predict(bagged_model, transformed_data)
