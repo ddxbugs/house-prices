@@ -26,6 +26,8 @@ if (!require(scales)) install.packages("scales")
 if (!require(ipred)) install.packages("ipred")
 if (!require(randomForest)) install.packages("randomForest")
 if (!require(caretEnsemble)) install.packages("caretEnsemble")
+if (!require(tidyverse)) install.packages("tidyverse")
+if (!require(rgl)) install.packages("rgl")
 library(caret)
 library(glmnet)
 library(olsrr)
@@ -37,6 +39,8 @@ library(scales)
 library(ipred)
 library(randomForest)
 library(caretEnsemble)
+library(tidyverse)
+library(rgl)
 ```
 
 ## Import the data
@@ -160,26 +164,77 @@ opt.pen <- glmnet.fit$finalModel$lambdaOpt
 coef(glmnet.fit$finalModel, opt.pen)
 
 # Create dummy variable for categorical predictors
-dummy_data <- model.matrix(SalePrice~.-1, data=transformed_data)
+dummy_data <- model.matrix(log(SalePrice)~., data=transformed_data)
 
 # Split data into predictor (x) and response (y)
 x <- dummy_data
-y <- transformed_data$SalePrice
+y <- log(transformed_data$SalePrice)
 grid <- 10^seq(10, -2, length=100)
 
 # LASSO
 lasso.mod <- glmnet(x, y, alpha=1, lambda=grid)
-cv.out <- cv.glmnet(x, y, alpha=1)
-plot(cv.out)
-best_lambda <- cv.out$lamdba.1se
-coef(cv.out, s=best_lambda)
+cv.lasso.out <- cv.glmnet(x, y, alpha=1)
+plot(cv.lasso.out)
+lasso_best_lambda <- cv.lasso.out$lambda.1se
+coef(cv.out, s=lasso_best_lambda)
 
 # RIDGE
 ridge.mod <- glmnet(x, y, alpha=0, lambda=grid)
-cv.out <- cv.glmnet(x, y, alpha=0)
-plot(cv.out)
-best_lambda <- cv.out$lambda.1se
-coef(cv.out, s=best_lambda)
+cv.ridge.out <- cv.glmnet(x, y, alpha=0)
+plot(cv.ridge.out)
+ridge_best_lambda <- cv.ridge.out$lambda.1se
+coef(cv.out, s=ridge_best_lambda)
+
+# Access lambda values
+lasso_lambda_min <- cv.lasso.out$lambda.min
+lasso_lambda_1se <- cv.lasso.out$lambda.1se
+ridge_lambda_min <- cv.ridge.out$lambda.min
+ridge_lambda_1se <- cv.ridge.out$lambda.1se
+
+# Compare cross-validated mean squared errors
+lasso_mse_min <- min(cv.lasso.out$cvm)
+ridge_mse_min <- min(cv.ridge.out$cvm)
+
+print(paste("LASSO MSE (lambda.min):", lasso_mse_min))
+print(paste("Ridge MSE (lambda.min):", ridge_mse_min))
+
+# Compare cross-validated errors at lambda.1se
+lasso_mse_1se <- cv.lasso.out$cvm[cv.lasso.out$lambda == lasso_lambda_1se]
+ridge_mse_1se <- cv.ridge.out$cvm[cv.ridge.out$lambda == ridge_lambda_1se]
+
+print(paste("LASSO MSE (lambda.1se):", lasso_mse_1se))
+print(paste("Ridge MSE (lambda.1se):", ridge_mse_1se))
+
+# Predictions
+lasso.pred <- predict(lasso.mod, newx=x)
+ridge.pred <- predict(ridge.mod, newx=x)
+
+# Back-transform predictions
+lasso.pred <- exp(lasso.pred)
+ridge.pred <- exp(ridge.pred)
+
+# Performance Metrics
+mse_lasso <- mean((transformed_data$SalePrice - lasso.pred)^2)
+mse_ridge <- mean((transformed_data$SalePrice - ridge.pred)^2)
+rmse_lasso <- sqrt(mse_lasso)
+rmse_ridge <- sqrt(mse_ridge)
+mae_lasso <- mean(abs(transformed_data$SalePrice - lasso.pred))
+mae_ridge <- mean(abs(transformed_data$SalePrice - ridge.pred))
+r2_lasso <- 1 - (sum((transformed_data$SalePrice - lasso.pred)^2) / sum((transformed_data$SalePrice - mean(transformed_data$SalePrice))^2))
+r2_ridge <- 1 - (sum((transformed_data$SalePrice - ridge.pred)^2) / sum((transformed_data$SalePrice - mean(transformed_data$SalePrice))^2))
+
+# Print performance metrics
+cat("LASSO Regression:\n")
+cat("MSE:", mse_lasso, "\n")
+cat("RMSE:", rmse_lasso, "\n")
+cat("MAE:", mae_lasso, "\n")
+cat("R-squared:", r2_lasso, "\n\n")
+
+cat("Ridge Regression:\n")
+cat("MSE:", mse_ridge, "\n")
+cat("RMSE:", rmse_ridge, "\n")
+cat("MAE:", mae_ridge, "\n")
+cat("R-squared:", r2_ridge, "\n")
 
 ```
 # Bootstrapping descriptive statistic
@@ -248,45 +303,29 @@ sd(xbar)
 
 ## K-fold Cross Validation 
 ```{r}
-# Quick fit K=1 and K=30
-#predictors <- data.frame(
-  #LandContour=land_contour,
-  #LotConfig=lot_config,
-  #Neighborhood=neighborhood,
-  #BldgType=bldg_type,
-  #OverallQual=overall_qual,
-  #OverallCond=overall_cond,
-  #OverallQual=seq(min(transformed_data$OverallQual), max(transformed_data$OverallQual), length.out = 50),
-  #OverallCond=seq(min(transformed_data$OverallCond), max(transformed_data$OverallCond), length.out = 50),
-  #YearBuilt=seq(min(transformed_data$YearBuilt), max(transformed_data$YearBuilt), length.out = 50),
-  #CentralAir=central_air,
-  #X1stFlrSF=seq(min(transformed_data$X1stFlrSF), max(transformed_data$X1stFlrSF), length.out = 50)
-  #X2ndFlrSF=seq(min(transformed_data$X2ndFlrSF), max(transformed_data$X2ndFlrSF), length.out = 50),
-  #TotRmsAbvGrd=tot_rms_abv_grd,
-  #TotRmsAbvGrd=seq(min(transformed_data$TotRmsAbvGrd), max(transformed_data$TotRmsAbvGrd), length.out = 50),
-  #Fireplaces=fireplaces,
-  #PavedDrive=paved_drive
-#)
+# Create dummy variable for categorical predictors
+dummy_data <- model.matrix(SalePrice~., data=transformed_data)
+
+# Split data into predictor (x) and response (y)
+x <- dummy_data
+y <- transformed_data$SalePrice
+data_combined <- as.data.frame(cbind(x, SalePrice = y))
 
 # Set K-fold parameters
 knnControl <- trainControl(method="repeatedcv", number=10, repeats=1)
 knn.fit <- train(SalePrice~., 
-                 data=transformed_data, 
+                 data=data_combined, 
                  method="knn", 
                  trControl=knnControl, 
                  tuneGrid=expand.grid(k=c(1:10, 20, 30)))
 plot(knn.fit)
 knn.fit
-
-# predictions <- predict(knn.fit, predictors)
-# prediction.surface <- matrix(predictions, 301, 51)
-# surface3d(0:300, 0:50, prediction.surface, alpha=0.4)
 ```
 
 ## Bagging with Multiple Linear Regression
 ```{r}
 # Create a formula
-formula <- SalePrice~.
+formula <- log(SalePrice)~.
 # Set up train control for bagging
 bootControl <- trainControl(method="boot", number=25)
 
@@ -294,8 +333,8 @@ bootControl <- trainControl(method="boot", number=25)
 bagged_model <- bagging(formula, data = transformed_data, method="lm", trControl=bootControl, nbagg = 1)
 
 # Predict and plot
-predictions <- predict(bagging_model, transformed_data)
-plot(X1stFlrSF, SalePrice, main = "Bagging with Linear Regression")
+predictions <- predict(bagged_model, transformed_data)
+plot(X1stFlrSF, SalePrice, data=transformed_data, main = "Bagging with Linear Regression")
 lines(X1stFlrSF, predictions, col = "red", lwd = 2)
 
 ```
@@ -304,7 +343,7 @@ lines(X1stFlrSF, predictions, col = "red", lwd = 2)
 ## Bootstrapping and Bagging with Random Forest
 ```{r}
 # Fit Random Forest
-rf_model <- randomForest(SalePrice~., data = transformed_data, ntree = 500)
+rf_model <- randomForest(SalePrice~., data = transformed_data, ntree = 5)
 # Print model summary
 print(rf_model)
 # Plot error rate as a function of the number of trees
@@ -356,31 +395,31 @@ ggplot(transformed_data_long, aes(x=Value, y=SalePrice)) +
 ## Ensemble multiple models
 ```{r}
 # Define training control
-# ensembleControl <- trainControl(method = "cv", number = 5, savePredictions = "final")
-# 
-# # List of models to ensemble
-# model_list <- caretList(
-#   SalePrice~.,
-#   data = transformed_data,
-#   trControl = ensembleControl,
-#   methodList = c("lm", "glmnet", "rf")
-# )
-# 
-# # Stacking models using linear regression as meta-model
-# stackControl <- trainControl(method = "cv", number = 5)
-# stacked_model <- caretStack(
-#   model_list,
-#   method = "glm",
-#   trControl = stackControl
-# )
-# 
-# # Predict and plot
-# predictions <- predict(stacked_model, newdata = transformed_data)
-# ggplot(data, aes(x = x, y = y)) +
-#   geom_point() +
-#   geom_line(aes(y = predictions), color = "green", size = 1.5) +
-#   ggtitle("Ensemble (Stacking)") +
-#   theme_minimal()
+ensembleControl <- trainControl(method = "cv", number = 5, savePredictions = "final")
+
+# List of models to ensemble
+model_list <- caretList(
+  SalePrice~.,
+  data = transformed_data,
+  trControl = ensembleControl,
+  methodList = c("lm", "glmnet", "rf")
+)
+
+# Stacking models using linear regression as meta-model
+stackControl <- trainControl(method = "cv", number = 5)
+stacked_model <- caretStack(
+  model_list,
+  method = "glm",
+  trControl = stackControl
+)
+
+# Predict and plot
+predictions <- predict(stacked_model, newdata = transformed_data)
+ggplot(data, aes(x = x, y = y)) +
+  geom_point() +
+  geom_line(aes(y = predictions), color = "green", size = 1.5) +
+  ggtitle("Ensemble (Stacking)") +
+  theme_minimal()
 
 ```
 
