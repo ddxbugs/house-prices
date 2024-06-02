@@ -278,9 +278,9 @@ knn.fit <- train(SalePrice~.,
 plot(knn.fit)
 knn.fit
 
-predictions <- predict(knn.fit, predictors)
-prediction.surface <- matrix(predictions, 301, 51)
-surface3d(0:300, 0:50, prediction.surface, alpha=0.4)
+# predictions <- predict(knn.fit, predictors)
+# prediction.surface <- matrix(predictions, 301, 51)
+# surface3d(0:300, 0:50, prediction.surface, alpha=0.4)
 ```
 
 ## Bagging with Multiple Linear Regression
