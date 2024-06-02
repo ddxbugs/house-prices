@@ -20,11 +20,13 @@ if (!require(caret)) install.packages("lmboot")
 if (!require(caret)) install.packages("glmnet")
 if (!require(caret)) install.packages("olsrr")
 if (!require(caret)) install.packages("car")
+if (!require(caret)) install.packages("boot")
 library(caret)
 library(glmnet)
 library(olsrr)
 library(car)
 library(lmboot)
+library(boot)
 ```
 
 ## Import the data
@@ -35,33 +37,10 @@ processed_data <- read.csv("../data/processed/processed_data.csv")
 ## Transform the data
 ```{r}
 transformed_data <- processed_data %>%
-  mutate(SalePrice=log(SalePrice))
+  select(-X)
 ```
 
-## Feature Selection
-```{r}
-ols_step_backward_p(fit, prem=0.05, details=FALSE)
-ols_step_forward_p(fit, penter=0.05, details=FALSE)
-ols_step_both_p(fit, prem=0.05, penter=0.05, details=TRUE)
-```
-
-## OBJECTIVE 1
-```{r}
-
-# Bootstrapping 
-# Bootstrap 95% CI
-# Bagging with Linear Regression
-
-train_control <- trainControl(method="cv", number=5)
-model <- train(SalePrice ~ ., data=transformed_data, method="lm", trControl=train_control)
-summary(model)
-
-stepwise_model <- train(SalePrice ~ OverallQual + X1stFlrSF + X2ndFlrSF + YearBuilt + OverallCond + Fireplaces + CentralAir + BldgType + Neighborhood + LandContour + TotRmsAbvGrd, data=transformed_data, method="lm", trControl=train_control)
-summary(stepwise_model)
-
-```
-
-## Fit a model
+## Build a model
 ```{r}
 fit <- lm(SalePrice~., data=transformed_data)
 summary(fit)
@@ -73,48 +52,107 @@ vif(fit)
 barplot(vif(fit), main="VIF Values", horiz=TRUE, col="lightblue")
 ```
 
+## Feature Selection
 ```{r}
-stepwise_fit <- lm(SalePrice ~ OverallQual + X1stFlrSF + X2ndFlrSF + YearBuilt + OverallCond + Fireplaces + CentralAir + BldgType + Neighborhood + LandContour + TotRmsAbvGrd, data=transformed_data)
+ols_step_backward_p(fit, prem=0.05, details=FALSE)
+ols_step_forward_p(fit, penter=0.05, details=FALSE)
+ols_step_both_p(fit, prem=0.05, penter=0.05, details=TRUE)
+```
+
+## Stepwise selection MLR model
+```{r}
+stepwise_fit <- lm(log(SalePrice) ~ OverallQual + X1stFlrSF + X2ndFlrSF + YearBuilt + OverallCond + Fireplaces + CentralAir + BldgType + Neighborhood + LandContour + TotRmsAbvGrd, data=transformed_data)
 summary(stepwise_fit)
 anova(stepwise_fit)
+confint(stepwise_fit)
 plot(stepwise_fit)
 hist(stepwise_fit$residuals, breaks="Sturges", main="Histogram of Residuals", xlab="Residuals")
 vif(stepwise_fit)
 barplot(vif(fit), main="VIF Values", horiz=TRUE, col="lightblue")
 ```
 
+## OBJECTIVE 1
+```{r}
 
+# Bootstrapping 
+# Bootstrap 95% CI
+# Bagging with Linear Regression
 
+train_control <- trainControl(method="cv", number=5)
+model <- train(log(SalePrice)~., data=transformed_data, method="lm", trControl=train_control)
+summary(model)
 
+stepwise_model <- train(log(SalePrice) ~ OverallQual + X1stFlrSF + X2ndFlrSF + YearBuilt + OverallCond + Fireplaces + CentralAir + BldgType + Neighborhood + LandContour + TotRmsAbvGrd, data=transformed_data, method="lm", trControl=train_control)
+summary(stepwise_model)
+
+```
 
 ## OBJECTIVE 2
 
 # Bootstrapping
 ```{r}
+# Boot function calculates median Sale Price
+median.func <- function(x, i) {
+  median(x[i])
+}
+median.func(transformed_data$SalePrice, 1:30)
+median(transformed_data$SalePrice)
+
+median.boot <- boot(transformed_data$SalePrice, median.func, R=2000)
+median.boot
+
+# Obtain bootstrap statistical CI
+boot.ci(median.boot, conf=0.95, type=c("perc", "basic", "bca"))
 
 # Take a sample of 30 observations to estimate median of population
-boot.sample <- sample(transformed_data, 100, replace=TRUE)
-hist(boot.sample$SalePrice)
-median(boot.sample$SalePrice)
+boot.sample <- sample(transformed_data$SalePrice, 30, replace=FALSE)
+hist(boot.sample)
+median(boot.sample)
 # Compute the bootstrap sampling distribution of the median
 medians <- c()
 B <- 2000
 for (i in 1:B) {
-  b.sample <- sample(preprocessed_data$SalePrice, 30, replace=TRUE)
+  b.sample <- sample(processed_data$SalePrice, 30, replace=TRUE)
   medians[i] <- median(b.sample)
 }
+# Plot sample Sale Price histogram distribution
 hist(medians, main="Bootstrap Sampling Distribution", xlab="Median Sale Price ($ USD)")
 
-# Obtain SE of median 
+# Obtain SE of median
 sd(medians)
+# 95% confidence interval
+quantile(medians, probs=c(0.025,0.975))
 
-boot.p <- paired.boot(SalePrice~., data=transformed_data, B=2000, seed=1234)
+boot.p <- paired.boot(log(SalePrice)~., data=transformed_data, B=2000, seed=1234)
 # Obtain bootstrap percentile CI for each coefficient
 apply(boot.p$bootEstParam, 2, quantile, probs=c(0.025, 0.975))
 
-boot.res <- residual.boot(SalePrice~., data=transformed_data, B=2000, seed=1234)
+boot.res <- residual.boot(log(SalePrice)~., data=transformed_data, B=2000, seed=1234)
 apply(boot.res$bootEstParam, 2, quantile, probs=c(0.025, 0.975))
 ```
+
+## Compare Bootstrapping vs. T-test result 
+```{r}
+t.result <- t.test(transformed_data$SalePrice)
+xbar <- c()
+B <- 2000
+for (i in 1:B) {
+  b.sample <- sample(transformed_data$SalePrice, 30, replace=TRUE)
+  xbar[i] <- mean(b.sample)
+}
+# Plot xbar Sale Price histogram distribution
+hist(xbar, main="Bootstrap Sampling Distribution", xlab="Average Sale Price")
+# Obtain SE of the xbar
+sd(xbar)
+# 95% Confidence interval for population mean
+quantile(xbar, probs=c(0.025, 0.975))
+t.result$conf.int
+# T-test SE of mean
+sd(transformed_data$SalePrice)/sqrt(30)
+# Bootstrap SE for the mean
+sd(xbar)
+```
+
 
 ```{r}
 knnControl <- trainControl(method="repeatedcv", number=10, repeats=1)
