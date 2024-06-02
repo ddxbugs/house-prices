@@ -14,18 +14,47 @@ getwd()
 
 ```{r}
 library(dplyr)
-library(readr)
+library(caret)
 library(naniar)
 ```
 
+## Import data set
 ```{r}
 raw_data <- read.csv("../data/raw/Iowa Housing Market.csv")
+dim(raw_data)
+vis_miss(raw_data)
 gg_miss_var(raw_data)
 colSums(is.na(raw_data))
 rows_with_na <- raw_data[!complete.cases(raw_data),]
 print(rows_with_na)
 ```
 
+## Imputation using median
+```{r}
+impute.median.info <- preProcess(raw_data[,-c(14)], method="medianImpute")
+clean_data <- predict(impute.median.info, newdata=raw_data)
+dim(clean_data)
+vis_miss(clean_data)
+```
+
+## Imputation using bagged trees
+```{r}
+
+```
+
+## Imputation using knn trees
+```{r}
+impute.knn.info <- preProcess(raw_data[,-c(14)], method="knnImpute", k=5, knnSummary=mean)
+clean_data <- predict(impute.knn.info, newdata=raw_data)
+dim(clean_data)
+vis_miss(clean_data)
+head(clean_data)
+```
+
+
+
+
+## Write to csv
 ```{r}
 processed_data <- raw_data %>%
   filter(complete.cases(.))
