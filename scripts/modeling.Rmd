@@ -132,19 +132,152 @@ barplot(vif(reduced_fit), main="VIF Values", horiz=TRUE, col="lightblue")
 
 ## OBJECTIVE 1
 ```{r}
-# Bootstrapping linear regression model
-lmControl <- trainControl(method="cv", number=5)
+# Building models
 
-full_model <- train(log(SalePrice)~., data=transformed_data, method="lm", trControl=lmControl)
-summary(full_model)
+# One model will include OverallCond and OverallQual
+model_with = lm(log(SalePrice) ~ ., data = ames)
 
-stepwise_model <- train(log(SalePrice) ~ OverallQual + X1stFlrSF + X2ndFlrSF + YearBuilt + OverallCond + Fireplaces + CentralAir + BldgType + Neighborhood + LandContour + TotRmsAbvGrd, data=transformed_data, method="lm", trControl=lmControl)
-summary(stepwise_model)
 
-custom_model <- train(log(SalePrice) ~ OverallQual + X1stFlrSF + X2ndFlrSF + YearBuilt + OverallCond + BldgType + Neighborhood,
-                  data=transformed_data, method="lm", trControl=lmControl)
-summary(custom_model)
+# One model WILL NOT include OverallCond and OverallQual
+model_without = lm(log(SalePrice) ~ . -OverallCond -OverallQual, data = ames)
+
+# One model will ONLY include OverallCond and OverallQual
+model_simple = lm(log(SalePrice) ~ OverallCond + OverallQual, data = ames)
+
+
+# Trying models with ONLY OverallCond OR OverallQual removed
+
+# No OverallCond
+fit_qual = lm(log(SalePrice) ~ . -OverallCond, data = ames)
+
+# No OverallQual
+fit_cond = lm(log(SalePrice) ~ . - OverallQual, data = ames)
+
+
+plot(model_with)
 ```
+ANOVA TESTING
+```{r}
+# Perform F-tests to compare models
+anova(model_without, model_with) # Model_with wins
+anova(model_simple, model_with) # Model_with wins
+anova(fit_qual, model_with) # Model_with wins
+anova(fit_cond, model_with) # Model_with wins
+
+# Perform F-test to compare fit_qual VERSUS fit_cond
+anova(fit_cond, fit_qual) # No statistically significant difference
+
+## OUR ANOVA F-TESTS SHOW US THAT A SIMPLE MODEL IS THE WORST MODEL FOR FIT.
+## ON THE NEXT LEVEL, HAVING A MODEL WITH BOTH PREDICTORS IS BETTER THAN HAVING
+## A MODEL WITHOUT BOTH PREDICTORS.
+## LASTLY, THERE IS NO SIGNIFICANT DIFFERENCE BETWEEN HAVING ONLY "OverallQual" OR 
+## ONLY "OverallCond" IN OUR MODEL, MEANING, IT IS BEST TO HAVE THEM BOTH IN OUR
+## FINAL MODEL.
+```
+CROSS VALIDATION
+```{r}
+# CROSS VALIDATION
+
+# Load necessary libraries
+library(caret)
+library(glmnet)
+
+# Define control for cross-validation
+control <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
+
+# Train models with glmnet (ridge and lasso regression)
+set.seed(321)
+cv_model_glmnet_with <- train(log(SalePrice) ~ ., data = ames, method = "glmnet", trControl = control)
+cv_model_glmnet_without <- train(log(SalePrice) ~ . -OverallCond -OverallQual, data = ames, method = "glmnet", trControl = control)
+cv_model_glmnet_simple <- train(log(SalePrice) ~ OverallCond + OverallQual, data = ames, method = "glmnet", trControl = control)
+cv_model_glmnet_qual <- train(log(SalePrice) ~ . -OverallCond, data = ames, method = "glmnet", trControl = control)
+cv_model_glmnet_cond <- train(log(SalePrice) ~ . -OverallQual, data = ames, method = "glmnet", trControl = control)
+
+# Extract results for glmnet models
+results_glmnet <- rbind(
+  data.frame(Model = "With All Predictors", cv_model_glmnet_with$results),
+  data.frame(Model = "Without OverallCond and OverallQual", cv_model_glmnet_without$results),
+  data.frame(Model = "Only OverallCond and OverallQual", cv_model_glmnet_simple$results),
+  data.frame(Model = "Without OverallCond", cv_model_glmnet_qual$results),
+  data.frame(Model = "Without OverallQual", cv_model_glmnet_cond$results)
+)
+
+# Average the RMSE and R2 for each model
+avg_results_glmnet <- results_glmnet %>%
+  group_by(Model) %>%
+  summarize(
+    Avg_RMSE = mean(RMSE),
+    Avg_R2 = mean(Rsquared)
+  )
+```
+
+
+BOOTSTRAPPING
+
+```{r}
+# Perform bootstrapping with 1000 resamples
+set.seed(321)
+boot_results <- boot(data = ames, statistic = coef.fun, R = 1000)
+
+# Filter out any rows in the bootstrapped statistics that have NA values
+valid_t <- apply(boot_results$t, 1, function(row) all(!is.na(row)))
+boot_results$t <- boot_results$t[valid_t, ]
+boot_results$R <- sum(valid_t)
+
+# Calculate 95% confidence intervals using the percentile method
+boot_conf_intervals <- lapply(1:length(coef(lm(log(SalePrice) ~ ., data = ames))), function(i) {
+  tryCatch({
+    ci <- boot.ci(boot_results, type = "perc", index = i)
+    if (is.null(ci)) stop("CI calculation failed")
+    return(ci)
+  }, error = function(e) {
+    cat("Error calculating CI for index", i, ":", e$message, "\n")
+    return(NULL)
+  })
+})
+
+# Print the confidence intervals
+names <- names(coef(lm(log(SalePrice) ~ ., data = ames)))
+for (i in 1:length(names)) {
+  cat("Confidence Interval for", names[i], ":\n")
+  print(boot_conf_intervals[[i]])
+  cat("\n")
+}
+
+# FINDING THE CONFIDENCE INTERVALS FOR OVERALLCOND AND OVERALLQUAL
+# Identify the indices for all levels of OverallQual and OverallCond
+overall_qual_indices <- grep("^OverallQual", names)
+overall_cond_indices <- grep("^OverallCond", names)
+
+# Print the indices for verification
+print(overall_qual_indices)
+print(overall_cond_indices)
+
+# Extract the confidence intervals for all levels of OverallQual and OverallCond
+ci_overall_qual <- lapply(overall_qual_indices, function(i) {
+  tryCatch(boot.ci(boot_results, type = "perc", index = i), error = function(e) e)
+})
+
+ci_overall_cond <- lapply(overall_cond_indices, function(i) {
+  tryCatch(boot.ci(boot_results, type = "perc", index = i), error = function(e) e)
+})
+
+# Print the confidence intervals
+cat("Confidence Intervals for OverallQual Levels:\n")
+for (i in 1:length(ci_overall_qual)) {
+  cat("Level", overall_qual_indices[i], ":\n")
+  print(ci_overall_qual[[i]])
+  cat("\n")
+}
+
+cat("Confidence Intervals for OverallCond Levels:\n")
+for (i in 1:length(ci_overall_cond)) {
+  cat("Level", overall_cond_indices[i], ":\n")
+  print(ci_overall_cond[[i]])
+  cat("\n")
+}
+```
+
 
 ## OBJECTIVE 2
 
